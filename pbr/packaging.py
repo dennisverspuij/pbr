@@ -40,6 +40,7 @@ from setuptools.command import sdist
 
 from pbr import extra_files
 from pbr import git
+from pbr import svn
 from pbr import options
 import pbr.pbr_json
 from pbr import testr_command
@@ -517,6 +518,9 @@ class LocalManifestMaker(egg_info.manifest_maker):
             rcfiles = git._find_git_files()
             if rcfiles:
                 self.filelist.extend(rcfiles)
+            rcfiles = svn._find_svn_files()
+            if rcfiles:
+                self.filelist.extend(rcfiles)
         elif os.path.exists(self.manifest):
             self.read_manifest()
         ei_cmd = self.get_finalized_command('egg_info')
@@ -535,12 +539,13 @@ class LocalEggInfo(egg_info.egg_info):
         If we are in an sdist command, then we always want to update
         SOURCES.txt. If we are not in an sdist command, then it doesn't
         matter one flip, and is actually destructive.
-        However, if we're in a git context, it's always the right thing to do
+        However, if we're in a git or svn context, it's always the right thing to do
         to recreate SOURCES.txt
         """
         manifest_filename = os.path.join(self.egg_info, "SOURCES.txt")
         if (not os.path.exists(manifest_filename) or
                 os.path.exists('.git') or
+                os.path.exists('.svn') or
                 'sdist' in sys.argv):
             log.info("[pbr] Processing SOURCES.txt")
             mm = LocalManifestMaker(self.distribution)
@@ -557,10 +562,13 @@ class LocalEggInfo(egg_info.egg_info):
 def _from_git(distribution):
     option_dict = distribution.get_option_dict('pbr')
     changelog = git._iter_log_oneline()
+    scm = git if changelog else svn
+    if not changelog:
+        changelog = svn._iter_log_oneline()
     if changelog:
         changelog = git._iter_changelog(changelog)
     git.write_git_changelog(option_dict=option_dict, changelog=changelog)
-    git.generate_authors(option_dict=option_dict)
+    scm.generate_authors(option_dict=option_dict)
 
 
 class LocalSDist(sdist.sdist):
@@ -642,7 +650,6 @@ def _get_increment_kwargs(git_dir, tag):
 
     :return: a dict of kwargs for passing into SemanticVersion.increment.
     """
-    result = {}
     if tag:
         version_spec = tag + "..HEAD"
     else:
@@ -659,6 +666,11 @@ def _get_increment_kwargs(git_dir, tag):
     for command in commands:
         symbols.update([symbol.strip() for symbol in command.split(',')])
 
+    return _get_increment_kwargs_for_symbols(symbols)
+
+
+def _get_increment_kwargs_for_symbols(symbols):
+    result = {}
     def _handle_symbol(symbol, symbols, impact):
         if symbol in symbols:
             result[impact] = True
@@ -774,6 +786,63 @@ def _get_version_from_git(pre_version=None):
         return ''
 
 
+def _get_increment_kwargs_svn(svn_dir, rev=None):
+    """Calculate the sort of semver increment needed from SVN history.
+
+    Every commit from revision rev up to the current revision of the working
+    copy in given directory svn_dir is considered for sem-ver revision property lines.
+    If rev is None, only the current revision will be processed.
+    See the pbr docs for their syntax.
+
+    :return: a dict of kwargs for passing into SemanticVersion.increment.
+    """
+    symbols = set()
+    for rev, logentry in svn._iter_log_xml(svn_dir, rev if rev else 'HEAD', 'HEAD', args=('-q', '--with-revprop', 'sem-ver')):
+        semver = logentry.find('./revprops/property[@name="sem-ver"]')
+        if semver is not None:
+            symbols.update([symbol.strip() for line in semver.text.lower().splitlines() for symbol in line.split(',')])
+    return _get_increment_kwargs_for_symbols(symbols)
+
+
+def _get_version_from_svn(pre_version=None):
+    """Calculate a version string from subversion.
+
+    If the revision is tagged, return that. Otherwise calculate a semantic
+    version description of the tree.
+
+    The number of revisions since the last tag is included in the dev counter
+    in the version for untagged versions.
+
+    :param pre_version: If supplied use this as the target version rather than
+        inferring one from the last tag + commit messages.
+    """
+    svn_dir = svn._run_svn_functions()
+    if svn_dir:
+        # Collect repository information
+        ancestry, tags = svn.get_ancestry_and_tags(svn_dir)
+        rev = ancestry[0]['last_rev']
+
+        if len(tags):
+            # if previously released we use last version
+            tag = tags[0]
+            new_version = tag['version']
+            if rev > tag['rev']:
+                # Increment the version using SVN revision properties 'sem-ver' if we have commits since last tag.
+                # Here we use the SVN revision as development suffix instead of the distance to previous tag, seems more useful
+                new_version = new_version.increment(**_get_increment_kwargs_svn(svn_dir, rev=tag['rev'] + 1)).to_dev(rev)
+        else:
+            new_version = version.SemanticVersion.from_pip_string(pre_version or '0').to_dev(rev)
+
+        return new_version.release_string()
+    # If we don't know the version, return an empty string so at least
+    # the downstream users of the value always have the same type of
+    # object to work with.
+    try:
+        return unicode()
+    except NameError:
+        return ''
+
+
 def _get_version_from_pkg_metadata(package_name):
     """Get the version from package metadata if present.
 
@@ -804,7 +873,7 @@ def get_version(package_name, pre_version=None):
     First, try getting it from PKG-INFO or METADATA, if it exists. If it does,
     that means we're in a distribution tarball or that install has happened.
     Otherwise, if there is no PKG-INFO or METADATA file, pull the version
-    from git.
+    from git or subversion.
 
     We do not support setup.py version sanity in git archive tarballs, nor do
     we support packagers directly sucking our git repo into theirs. We expect
@@ -824,6 +893,8 @@ def get_version(package_name, pre_version=None):
     if version:
         return version
     version = _get_version_from_git(pre_version)
+    if version == '':
+        version = _get_version_from_svn(pre_version)
     # Handle http://bugs.python.org/issue11638
     # version will either be an empty unicode string or a valid
     # unicode version string, but either way it's unicode and needs to
@@ -833,7 +904,7 @@ def get_version(package_name, pre_version=None):
     if version:
         return version
     raise Exception("Versioning for this project requires either an sdist"
-                    " tarball, or access to an upstream git repository."
+                    " tarball, or access to an upstream git or subversion repository."
                     " It's also possible that there is a mismatch between"
                     " the package name in setup.cfg and the argument given"
                     " to pbr.version.VersionInfo. Project name {name} was"

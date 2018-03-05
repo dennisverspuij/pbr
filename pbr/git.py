@@ -31,7 +31,7 @@ from pbr import options
 from pbr import version
 
 
-def _run_shell_command(cmd, throw_on_error=False, buffer=True, env=None):
+def _run_shell_command(cmd, throw_on_error=False, buffer=True, env=None, cwd=None):
     if buffer:
         out_location = subprocess.PIPE
         err_location = subprocess.PIPE
@@ -46,6 +46,7 @@ def _run_shell_command(cmd, throw_on_error=False, buffer=True, env=None):
     output = subprocess.Popen(cmd,
                               stdout=out_location,
                               stderr=err_location,
+                              cwd=cwd,
                               env=newenv)
     out = output.communicate()
     if output.returncode and throw_on_error:
