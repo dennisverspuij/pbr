@@ -263,7 +263,7 @@ def write_git_changelog(git_dir=None, dest_dir=os.path.curdir,
         option_dict = {}
     should_skip = options.get_boolean_option(option_dict, 'skip_changelog',
                                              'SKIP_WRITE_GIT_CHANGELOG')
-    changelog_file_name = option_dict.get(changelog_file_name, 'ChangeLog')
+    changelog_file_name = option_dict.get('changelog_file_name', (None,'ChangeLog'))[1]
     if should_skip:
         return
     if not changelog:
