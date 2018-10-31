@@ -230,6 +230,13 @@ The ``pbr`` section controls *pbr*-specific options and behaviours.
   This can also be configured using the ``SKIP_GENERATE_AUTHORS`` environment
   variable, as described :ref:`here <packaging-authors-changelog>`
 
+``skip_reno``
+  If enabled, *pbr* will not generate a ``RELEASENOTES.txt`` file if `reno`_ is
+  present and configured.
+
+  This can also be configured using the ``SKIP_GENERATE_RENO`` environment
+  variable, as described :ref:`here <packaging-releasenotes>`.
+
 ``autodoc_tree_index_modules``
   A boolean option controlling whether *pbr* should generate an index of
   modules using ``sphinx-apidoc``. By default, all files except ``setup.py``
@@ -382,20 +389,18 @@ Requirements
 
 Requirements files are used in place of the ``install_requires`` and
 ``extras_require`` attributes. Requirement files should be given one of the
-below names. This order is also the order that the requirements are tried in
-(where ``N`` is the Python major version number used to install the package):
+below names. This order is also the order that the requirements are tried in:
 
-* ``requirements-pyN.txt``
-* ``tools/pip-requires-py3``
 * ``requirements.txt``
 * ``tools/pip-requires``
 
 Only the first file found is used to install the list of packages it contains.
 
-.. note::
+.. versionchanged:: 5.0
 
-   The ``requirements-pyN.txt`` file is deprecated - ``requirements.txt``
-   should be universal. You can use `Environment markers`_ for this purpose.
+   Previously you could specify requirements for a given major version of
+   Python using requirements files with a ``-pyN`` suffix. This was deprecated
+   in 4.0 and removed in 5.0 in favour of environment markers.
 
 .. _extra-requirements:
 
@@ -489,3 +494,4 @@ this file.
 
 .. _setuptools: http://www.sphinx-doc.org/en/stable/setuptools.html
 .. _sphinxcontrib-apidoc: https://pypi.org/project/sphinxcontrib-apidoc/
+.. _reno: https://docs.openstack.org/reno/latest/

@@ -43,7 +43,6 @@ import email.errors
 import imp
 import os
 import re
-import sys
 import sysconfig
 import tempfile
 import textwrap
@@ -56,7 +55,7 @@ import testscenarios
 import testtools
 from testtools import matchers
 import virtualenv
-import wheel.install
+from wheel import wheelfile
 
 from pbr import git
 from pbr import packaging
@@ -372,13 +371,13 @@ class TestPackagingWheels(base.BaseTestCase):
         relative_wheel_filename = os.listdir(dist_dir)[0]
         absolute_wheel_filename = os.path.join(
             dist_dir, relative_wheel_filename)
-        wheel_file = wheel.install.WheelFile(absolute_wheel_filename)
+        wheel_file = wheelfile.WheelFile(absolute_wheel_filename)
         wheel_name = wheel_file.parsed_filename.group('namever')
         # Create a directory path to unpack the wheel to
         self.extracted_wheel_dir = os.path.join(dist_dir, wheel_name)
         # Extract the wheel contents to the directory we just created
-        wheel_file.zipfile.extractall(self.extracted_wheel_dir)
-        wheel_file.zipfile.close()
+        wheel_file.extractall(self.extracted_wheel_dir)
+        wheel_file.close()
 
     def test_data_directory_has_wsgi_scripts(self):
         # Build the path to the scripts directory
@@ -548,28 +547,6 @@ class ParseRequirementsTest(base.BaseTestCase):
             f.write('pbr')
         result = packaging.parse_requirements([requirements])
         self.assertEqual(['pbr'], result)
-
-    @mock.patch('warnings.warn')
-    def test_python_version(self, mock_warn):
-        with open("requirements-py%d.txt" % sys.version_info[0],
-                  "w") as fh:
-            fh.write("# this is a comment\nfoobar\n# and another one\nfoobaz")
-        self.assertEqual(['foobar', 'foobaz'],
-                         packaging.parse_requirements())
-        mock_warn.assert_called_once_with(mock.ANY, DeprecationWarning)
-
-    @mock.patch('warnings.warn')
-    def test_python_version_multiple_options(self, mock_warn):
-        with open("requirements-py1.txt", "w") as fh:
-            fh.write("thisisatrap")
-        with open("requirements-py%d.txt" % sys.version_info[0],
-                  "w") as fh:
-            fh.write("# this is a comment\nfoobar\n# and another one\nfoobaz")
-        self.assertEqual(['foobar', 'foobaz'],
-                         packaging.parse_requirements())
-        # even though we have multiple offending files, this should only be
-        # called once
-        mock_warn.assert_called_once_with(mock.ANY, DeprecationWarning)
 
 
 class ParseRequirementsTestScenarios(base.BaseTestCase):
