@@ -113,6 +113,7 @@ D1_D2_SETUP_ARGS = {
     "setup_requires": ("metadata", "setup_requires_dist"),
     "python_requires": ("metadata",),
     "provides": ("metadata", "provides_dist"),  # **
+    "provides_extras": ("metadata",),
     "obsoletes": ("metadata", "obsoletes_dist"),  # **
     "package_dir": ("files", 'packages_root'),
     "packages": ("files",),
@@ -146,7 +147,9 @@ MULTI_FIELDS = ("classifiers",
                 "dependency_links",
                 "setup_requires",
                 "tests_require",
-                "cmdclass")
+                "keywords",
+                "cmdclass",
+                "provides_extras")
 
 # setup() arguments that can have mapping values in setup.cfg
 MAP_FIELDS = ("project_urls",)
@@ -154,8 +157,7 @@ MAP_FIELDS = ("project_urls",)
 # setup() arguments that contain boolean values
 BOOL_FIELDS = ("use_2to3", "zip_safe", "include_package_data")
 
-
-CSV_FIELDS = ("keywords",)
+CSV_FIELDS = ()
 
 
 def resolve_name(name):
@@ -333,7 +335,7 @@ def setup_cfg_to_setup_kwargs(config, script_args=()):
         elif arg in MAP_FIELDS:
             in_cfg_map = {}
             for i in split_multiline(in_cfg_value):
-                k, v = i.split('=')
+                k, v = i.split('=', 1)
                 in_cfg_map[k.strip()] = v.strip()
             in_cfg_value = in_cfg_map
         elif arg in BOOL_FIELDS:

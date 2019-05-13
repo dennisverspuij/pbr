@@ -49,7 +49,7 @@ versions of `setuptools`__. A simple sample can be found in *pbr*'s own
     [metadata]
     name = pbr
     author = OpenStack Foundation
-    author-email = openstack-dev@lists.openstack.org
+    author-email = openstack-discuss@lists.openstack.org
     summary = OpenStack's setup automation in a reusable form
     description-file = README.rst
     description-content-type = text/x-rst; charset=UTF-8
@@ -102,7 +102,7 @@ In addition, there are some modifications to other sections:
 
 For all other sections, you should refer to either the `setuptools`_
 documentation or the documentation of the package that provides the section,
-such as the ``extract_mesages`` section provided by Babel__.
+such as the ``extract_messages`` section provided by Babel__.
 
 .. note::
 
